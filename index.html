@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SEQCOM Prototype</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            color: #2d3748;
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header p {
+            color: #718096;
+            font-size: 1.1rem;
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .panel {
+            background: #f7fafc;
+            border-radius: 15px;
+            padding: 25px;
+            border: 1px solid #e2e8f0;
+            transition: all 0.3s ease;
+        }
+
+        .panel:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+
+        .panel h3 {
+            color: #2d3748;
+            margin-bottom: 20px;
+            font-size: 1.3rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .icon {
+            width: 24px;
+            height: 24px;
+            display: inline-block;
+        }
+
+        textarea, input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s ease;
+            font-family: inherit;
+        }
+
+        textarea {
+            height: 120px;
+            resize: vertical;
+        }
+
+        textarea:focus, input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .button {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            margin-top: 15px;
+        }
+
+        .button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .button:active {
+            transform: translateY(0);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #4299e1, #3182ce);
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            transition: transform 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: scale(1.05);
+        }
+
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+        .output-area {
+            background: #1a202c;
+            color: #e2e8f0;
+            padding: 20px;
+            border-radius: 12px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 13px;
+            line-height: 1.5;
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            margin-top: 20px;
+        }
+
+        .memory-item {
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 10px;
+            transition: all 0.3s ease;
+        }
+
+        .memory-item:hover {
+            border-color: #667eea;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.1);
+        }
+
+        .memory-header {
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            margin-bottom: 10px;
+            font-size: 12px;
+            color: #718096;
+        }
+
+        .memory-content {
+            color: #2d3748;
+            line-height: 1.4;
+        }
+
+        .tag {
+            display: inline-block;
+            background: #edf2f7;
+            color: #4a5568;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            margin-right: 5px;
+        }
+
+        .score-bar {
+            width: 100%;
+            height: 4px;
+            background: #e2e8f0;
+            border-radius: 2px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+
+        .score-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #48bb78, #38a169);
+            transition: width 0.3s ease;
+        }
+
+        .tabs {
+            display: flex;
+            border-bottom: 2px solid #e2e8f0;
+            margin-bottom: 20px;
+        }
+
+        .tab {
+            padding: 12px 20px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+
+        .tab.active {
+            border-bottom-color: #667eea;
+            color: #667eea;
+        }
+
+        .tab:hover {
+            background: #f7fafc;
+        }
+
+        .input-group {
+            margin-bottom: 15px;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: #4a5568;
+        }
+
+        @media (max-width: 768px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .container {
+                padding: 20px;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>SEQCOM Prototype</h1>
+            <p>Sequential Compression Memory - Smart Context Management</p>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-number" id="eventCount">0</div>
+                <div class="stat-label">Events</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="memoryCount">0</div>
+                <div class="stat-label">Memories</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="tokenCount">0</div>
+                <div class="stat-label">Est. Tokens</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="compressionRatio">0%</div>
+                <div class="stat-label">Compression</div>
+            </div>
+        </div>
+
+        <div class="main-grid">
+            <div class="panel">
+                <h3>
+                    <span class="icon">💭</span>
+                    Remember Event
+                </h3>
+                <div class="input-group">
+                    <label>Message/Event:</label>
+                    <textarea id="eventText" placeholder="Enter text to remember..."></textarea>
+                </div>
+                <div class="input-group">
+                    <label>Tags (comma-separated):</label>
+                    <input type="text" id="eventTags" placeholder="project, meeting, important">
+                </div>
+                <button class="button" onclick="addEvent()">Remember Event</button>
+            </div>
+
+            <div class="panel">
+                <h3>
+                    <span class="icon">🔍</span>
+                    Retrieve Context
+                </h3>
+                <div class="input-group">
+                    <label>Task Description:</label>
+                    <textarea id="taskText" placeholder="What are you working on?"></textarea>
+                </div>
+                <div class="input-group">
+                    <label>Token Budget:</label>
+                    <input type="number" id="tokenBudget" value="800" min="100" max="4000">
+                </div>
+                <button class="button" onclick="retrieveContext()">Retrieve Context</button>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="tabs">
+                <div class="tab active" onclick="showTab('memories')">Memories</div>
+                <div class="tab" onclick="showTab('events')">Recent Events</div>
+                <div class="tab" onclick="showTab('context')">Retrieved Context</div>
+            </div>
+
+            <div id="memoriesTab" class="tab-content">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h4>Compressed Memories</h4>
+                    <button class="button" onclick="compressMemories()">🗜️ Compress Now</button>
+                </div>
+                <div id="memoriesList"></div>
+            </div>
+
+            <div id="eventsTab" class="tab-content" style="display: none;">
+                <h4>Recent Events</h4>
+                <div id="eventsList"></div>
+            </div>
+
+            <div id="contextTab" class="tab-content" style="display: none;">
+                <h4>Retrieved Context</h4>
+                <div id="contextOutput" class="output-area">No context retrieved yet...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // SEQCOM Implementation in JavaScript
+        class SEQCOMPrototype {
+            constructor() {
+                this.events = [];
+                this.memories = [];
+                this.feedbackLog = [];
+                this.eventIdCounter = 1;
+            }
+
+            // Core SEQCOM Methods
+            remember(event) {
+                const eventWithId = {
+                    id: this.eventIdCounter++,
+                    timestamp: Date.now(),
+                    type: 'msg',
+                    role: 'user',
+                    ...event
+                };
+                this.events.push(eventWithId);
+                return eventWithId.id.toString();
+            }
+
+            compress() {
+                // Summarizer compressor
+                const textEvents = this.events.filter(e => e.text && e.text.length > 50);
+                if (textEvents.length >= 3) {
+                    const combinedText = textEvents.slice(-5).map(e => e.text).join(' ');
+                    if (combinedText.length > 200) {
+                        this.upsertMemory({
+                            id: `summary_${Date.now()}`,
+                            type: 'summary',
+                            content: this.summarizeText(combinedText),
+                            tags: [...new Set(textEvents.flatMap(e => e.tags || []))],
+                            score: 0.8,
+                            meta: { source_events: textEvents.length }
+                        });
+                    }
+                }
+
+                // Delta compressor - track changes
+                const recentEvents = this.events.slice(-10);
+                const topics = this.extractTopics(recentEvents);
+                topics.forEach(topic => {
+                    if (topic.changes.length > 0) {
+                        this.upsertMemory({
+                            id: `delta_${topic.name}_${Date.now()}`,
+                            type: 'delta',
+                            content: `${topic.name}: ${topic.changes.join(', ')}`,
+                            tags: [topic.name, 'change'],
+                            score: 0.7,
+                            meta: { topic: topic.name }
+                        });
+                    }
+                });
+
+                // Dedupe compressor
+                this.deduplicateMemories();
+            }
+
+            retrieve(task, budgetTokens = 1200, tags = []) {
+                const relevantMemories = this.selectRelevantMemories(task, tags);
+                const packedContext = this.packContext(relevantMemories, budgetTokens);
+                return packedContext;
+            }
+
+            feedback(success, artifacts = {}) {
+                this.feedbackLog.push({
+                    timestamp: Date.now(),
+                    success,
+                    artifacts
+                });
+            }
+
+            // Helper Methods
+            upsertMemory(memory) {
+                const existingIndex = this.memories.findIndex(m => m.id === memory.id);
+                if (existingIndex >= 0) {
+                    this.memories[existingIndex] = { ...this.memories[existingIndex], ...memory };
+                } else {
+                    this.memories.push({
+                        timestamp: Date.now(),
+                        score: 0.5,
+                        ...memory
+                    });
+                }
+            }
+
+            summarizeText(text) {
+                // Simple extractive summarization
+                const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 10);
+                if (sentences.length <= 2) return text;
+                
+                // Score sentences by keyword density and position
+                const keywords = this.extractKeywords(text);
+                const scoredSentences = sentences.map((sent, idx) => {
+                    const keywordScore = keywords.reduce((score, kw) => 
+                        score + (sent.toLowerCase().includes(kw.toLowerCase()) ? 1 : 0), 0);
+                    const positionScore = idx === 0 ? 0.5 : 0; // Boost first sentence
+                    return { text: sent.trim(), score: keywordScore + positionScore };
+                });
+
+                // Take top sentences up to ~half original length
+                const sortedSentences = scoredSentences.sort((a, b) => b.score - a.score);
+                const targetLength = Math.floor(text.length * 0.6);
+                let summary = '';
+                for (const sent of sortedSentences) {
+                    if (summary.length + sent.text.length < targetLength) {
+                        summary += sent.text + '. ';
+                    }
+                }
+                return summary.trim() || sentences[0];
+            }
+
+            extractKeywords(text) {
+                const words = text.toLowerCase().match(/\b\w{4,}\b/g) || [];
+                const freq = {};
+                words.forEach(word => freq[word] = (freq[word] || 0) + 1);
+                return Object.entries(freq)
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 10)
+                    .map(([word]) => word);
+            }
+
+            extractTopics(events) {
+                const topics = {};
+                events.forEach(event => {
+                    if (event.tags) {
+                        event.tags.forEach(tag => {
+                            if (!topics[tag]) topics[tag] = { name: tag, changes: [] };
+                            if (event.text) topics[tag].changes.push(event.text.slice(0, 100));
+                        });
+                    }
+                });
+                return Object.values(topics);
+            }
+
+            selectRelevantMemories(task, tags) {
+                const taskLower = task.toLowerCase();
+                const taskWords = taskLower.match(/\b\w+\b/g) || [];
+                
+                return this.memories
+                    .map(memory => {
+                        let relevanceScore = memory.score || 0.5;
+                        
+                        // Tag matching
+                        const memoryTags = memory.tags || [];
+                        const tagMatches = tags.filter(tag => 
+                            memoryTags.some(mt => mt.toLowerCase().includes(tag.toLowerCase()))
+                        ).length;
+                        relevanceScore += tagMatches * 0.3;
+                        
+                        // Content relevance
+                        const content = (memory.content || '').toLowerCase();
+                        const wordMatches = taskWords.filter(word => content.includes(word)).length;
+                        relevanceScore += (wordMatches / Math.max(taskWords.length, 1)) * 0.4;
+                        
+                        // Time decay (30-day half-life)
+                        const ageHours = (Date.now() - memory.timestamp) / (1000 * 60 * 60);
+                        const decayFactor = Math.pow(0.5, ageHours / (30 * 24));
+                        relevanceScore *= decayFactor;
+                        
+                        return { ...memory, relevanceScore };
+                    })
+                    .sort((a, b) => b.relevanceScore - a.relevanceScore)
+                    .slice(0, 20); // Top 20 most relevant
+            }
+
+            packContext(memories, budgetTokens) {
+                const budgetChars = budgetTokens * 4;
+                const header = "### SEQCOM CONTEXT START\n";
+                const footer = "\n### SEQCOM CONTEXT END\n";
+                
+                let context = header;
+                const included = [];
+                
+                for (const memory of memories) {
+                    const chunk = `\n[${(memory.type || 'mem').toUpperCase()}]\n${(memory.content || '').slice(0, 1000)}\n`;
+                    if (context.length + chunk.length + footer.length > budgetChars) break;
+                    context += chunk;
+                    included.push(memory);
+                }
+                
+                context += footer;
+                return { context, items: included, tokenUsage: Math.ceil(context.length / 4) };
+            }
+
+            deduplicateMemories() {
+                const seen = new Set();
+                this.memories = this.memories.filter(memory => {
+                    const signature = (memory.content || '').slice(0, 100).toLowerCase().trim();
+                    if (seen.has(signature)) return false;
+                    seen.add(signature);
+                    return true;
+                });
+            }
+
+            getStats() {
+                const totalChars = this.memories.reduce((sum, m) => sum + (m.content || '').length, 0);
+                const eventChars = this.events.reduce((sum, e) => sum + (e.text || '').length, 0);
+                const compressionRatio = eventChars > 0 ? Math.round((1 - totalChars / eventChars) * 100) : 0;
+                
+                return {
+                    events: this.events.length,
+                    memories: this.memories.length,
+                    approxTokens: Math.ceil(totalChars / 4),
+                    compressionRatio: Math.max(0, compressionRatio)
+                };
+            }
+        }
+
+        // Global instance
+        const seqcom = new SEQCOMPrototype();
+
+        // UI Functions
+        function addEvent() {
+            const text = document.getElementById('eventText').value.trim();
+            const tagsInput = document.getElementById('eventTags').value.trim();
+            
+            if (!text) {
+                alert('Please enter some text to remember');
+                return;
+            }
+
+            const tags = tagsInput ? tagsInput.split(',').map(t => t.trim()).filter(t => t) : [];
+            
+            const eventId = seqcom.remember({ text, tags });
+            
+            document.getElementById('eventText').value = '';
+            document.getElementById('eventTags').value = '';
+            
+            updateStats();
+            showRecentEvents();
+            
+            // Auto-compress if we have enough events
+            if (seqcom.events.length % 5 === 0) {
+                setTimeout(() => {
+                    seqcom.compress();
+                    updateStats();
+                    if (document.querySelector('.tab.active').textContent === 'Memories') {
+                        showMemories();
+                    }
+                }, 500);
+            }
+        }
+
+        function compressMemories() {
+            seqcom.compress();
+            updateStats();
+            showMemories();
+        }
+
+        function retrieveContext() {
+            const task = document.getElementById('taskText').value.trim();
+            const budget = parseInt(document.getElementById('tokenBudget').value) || 800;
+            
+            if (!task) {
+                alert('Please enter a task description');
+                return;
+            }
+
+            const result = seqcom.retrieve(task, budget);
+            
+            document.getElementById('contextOutput').textContent = 
+                `Context (${result.tokenUsage} tokens):\n\n${result.context}\n\nIncluded ${result.items.length} memories.`;
+            
+            showTab('context');
+        }
+
+        function showTab(tabName) {
+            // Update tab appearance
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            // Hide all content
+            document.querySelectorAll('.tab-content').forEach(content => content.style.display = 'none');
+            
+            // Show selected content
+            document.getElementById(`${tabName}Tab`).style.display = 'block';
+            
+            // Load content
+            if (tabName === 'memories') showMemories();
+            else if (tabName === 'events') showRecentEvents();
+        }
+
+        function showMemories() {
+            const container = document.getElementById('memoriesList');
+            
+            if (seqcom.memories.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: #718096; padding: 40px;">No memories yet. Add some events and compress them!</p>';
+                return;
+            }
+
+            const sorted = [...seqcom.memories].sort((a, b) => (b.score || 0) - (a.score || 0));
+            
+            container.innerHTML = sorted.map(memory => `
+                <div class="memory-item">
+                    <div class="memory-header">
+                        <span><strong>${memory.type || 'memory'}</strong> • ${new Date(memory.timestamp).toLocaleString()}</span>
+                        <div>
+                            ${(memory.tags || []).map(tag => `<span class="tag">${tag}</span>`).join('')}
+                        </div>
+                    </div>
+                    <div class="memory-content">${memory.content || 'No content'}</div>
+                    <div class="score-bar">
+                        <div class="score-fill" style="width: ${(memory.score || 0) * 100}%"></div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function showRecentEvents() {
+            const container = document.getElementById('eventsList');
+            
+            if (seqcom.events.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: #718096; padding: 40px;">No events yet. Add some using the Remember Event panel!</p>';
+                return;
+            }
+
+            const recent = seqcom.events.slice(-10).reverse();
+            
+            container.innerHTML = recent.map(event => `
+                <div class="memory-item">
+                    <div class="memory-header">
+                        <span><strong>Event #${event.id}</strong> • ${new Date(event.timestamp).toLocaleString()}</span>
+                        <div>
+                            ${(event.tags || []).map(tag => `<span class="tag">${tag}</span>`).join('')}
+                        </div>
+                    </div>
+                    <div class="memory-content">${event.text || 'No content'}</div>
+                </div>
+            `).join('');
+        }
+
+        function updateStats() {
+            const stats = seqcom.getStats();
+            document.getElementById('eventCount').textContent = stats.events;
+            document.getElementById('memoryCount').textContent = stats.memories;
+            document.getElementById('tokenCount').textContent = stats.approxTokens;
+            document.getElementById('compressionRatio').textContent = `${stats.compressionRatio}%`;
+        }
+
+        // Initialize with demo data
+        function initializeDemo() {
+            seqcom.remember({
+                text: "Planning a 7-day trip to Kyoto with focus on traditional culture",
+                tags: ["travel", "planning", "kyoto"]
+            });
+            
+            seqcom.remember({
+                text: "Need to include tea ceremony experience and kaiseki dinner reservations",
+                tags: ["travel", "cultural", "dining"]
+            });
+            
+            seqcom.remember({
+                text: "Research best temples for morning visits - Kinkaku-ji and Fushimi Inari mentioned",
+                tags: ["travel", "temples", "morning"]
+            });
+            
+            seqcom.remember({
+                text: "Budget constraint: $2000 total for accommodations and experiences",
+                tags: ["travel", "budget", "constraints"]
+            });
+            
+            seqcom.remember({
+                text: "Consider staying in traditional ryokan for authentic experience",
+                tags: ["travel", "accommodation", "traditional"]
+            });
+
+            updateStats();
+            showMemories();
+        }
+
+        // Initialize on load
+        window.addEventListener('load', () => {
+            initializeDemo();
+        });
+
+        // Handle Enter key in textareas
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('eventText').addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && e.ctrlKey) {
+                    addEvent();
+                }
+            });
+            
+            document.getElementById('taskText').addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && e.ctrlKey) {
+                    retrieveContext();
+                }
+            });
+        });
+    </script>
+</body>
+</html>
