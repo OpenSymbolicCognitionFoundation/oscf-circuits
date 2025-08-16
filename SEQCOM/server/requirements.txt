@@ -1,0 +1,170 @@
+# SEQCOM FastAPI Server - Requirements
+# Core dependencies for the single-file SEQCOM server
+
+# ==================== CORE DEPENDENCIES ====================
+# These are required for basic functionality
+
+fastapi>=0.104.1
+uvicorn[standard]>=0.24.0
+pydantic>=2.5.0
+aiohttp>=3.9.1
+python-multipart>=0.0.6
+
+# ==================== LLM INTEGRATIONS ====================
+# Optional: Install these for real LLM API integration
+# Comment out if you only want simulation mode
+
+openai>=1.3.0
+anthropic>=0.18.0
+
+# ==================== OPTIONAL ENHANCEMENTS ====================
+# Uncomment these for additional features
+
+# For better semantic search and embeddings
+# sentence-transformers>=2.2.0
+# numpy>=1.24.0
+# faiss-cpu>=1.7.4
+
+# For Redis session storage (alternative to SQLite)
+# redis>=5.0.0
+
+# For monitoring and metrics
+# prometheus-client>=0.19.0
+# structlog>=23.2.0
+
+# For enhanced text processing
+# spacy>=3.7.0
+# nltk>=3.8.0
+
+# ==================== DEVELOPMENT DEPENDENCIES ====================
+# Uncomment for development and testing
+
+# pytest>=7.4.0
+# pytest-asyncio>=0.21.0
+# httpx>=0.25.0
+# black>=23.0.0
+# mypy>=1.7.0
+# flake8>=6.0.0
+# pre-commit>=3.5.0
+
+# ==================== PRODUCTION DEPENDENCIES ====================
+# Uncomment for production deployment
+
+# gunicorn>=21.2.0
+# python-dotenv>=1.0.0
+# psycopg2-binary>=2.9.0  # For PostgreSQL
+# alembic>=1.12.0         # For database migrations
+
+# ==================== INSTALLATION NOTES ====================
+#
+# MINIMAL INSTALL (simulation mode only):
+#   pip install fastapi uvicorn pydantic aiohttp python-multipart
+#
+# STANDARD INSTALL (with LLM APIs):
+#   pip install -r requirements.txt
+#
+# DEVELOPMENT INSTALL:
+#   Uncomment dev dependencies above, then:
+#   pip install -r requirements.txt
+#
+# PRODUCTION INSTALL:
+#   Uncomment production dependencies above, then:
+#   pip install -r requirements.txt
+#
+# ==================== PLATFORM SPECIFIC ====================
+#
+# Windows users may need:
+# pywin32>=306
+#
+# macOS users with M1/M2 may need:
+# tensorflow-macos>=2.13.0  # If using ML features
+#
+# Linux users may need:
+# python3-dev
+# build-essential
+#
+# ==================== VERSION COMPATIBILITY ====================
+#
+# Python: >=3.8 (tested on 3.8, 3.9, 3.10, 3.11, 3.12)
+# FastAPI: >=0.100.0 (latest features)
+# Uvicorn: >=0.20.0 (ASGI server)
+# Pydantic: >=2.0.0 (v2 for better performance)
+#
+# ==================== QUICK START COMMANDS ====================
+#
+# 1. Create virtual environment:
+#    python -m venv seqcom_env
+#    source seqcom_env/bin/activate  # Linux/Mac
+#    seqcom_env\Scripts\activate     # Windows
+#
+# 2. Install dependencies:
+#    pip install --upgrade pip
+#    pip install -r requirements.txt
+#
+# 3. Set environment variables (optional):
+#    export OPENAI_API_KEY="sk-your-key"
+#    export ANTHROPIC_API_KEY="sk-ant-your-key"
+#
+# 4. Run server:
+#    python seqcom_server.py
+#
+# 5. Test installation:
+#    curl http://localhost:8000/
+#    # Should return: {"message": "🧠 SEQCOM Server is running", ...}
+#
+# ==================== TROUBLESHOOTING ====================
+#
+# Common issues and solutions:
+#
+# 1. "ModuleNotFoundError: No module named 'fastapi'"
+#    Solution: pip install fastapi
+#
+# 2. "ImportError: No module named 'openai'"
+#    Solution: pip install openai (or use simulation mode)
+#
+# 3. "sqlite3.OperationalError: database is locked"
+#    Solution: Ensure no other instances are running
+#
+# 4. "Port 8000 already in use"
+#    Solution: Change port in main() function or kill existing process
+#
+# 5. "ModuleNotFoundError: No module named 'uvicorn'"
+#    Solution: pip install uvicorn[standard]
+#
+# ==================== SECURITY NOTES ====================
+#
+# For production deployment:
+# 1. Never commit API keys to version control
+# 2. Use environment variables or secret management
+# 3. Enable HTTPS with reverse proxy (nginx/caddy)
+# 4. Configure CORS origins properly
+# 5. Set up proper authentication if needed
+# 6. Use production-grade database (PostgreSQL)
+# 7. Enable logging and monitoring
+#
+# ==================== PERFORMANCE OPTIMIZATION ====================
+#
+# For high-traffic deployments:
+# 1. Use multiple workers: uvicorn --workers 4
+# 2. Add Redis for session caching
+# 3. Use PostgreSQL instead of SQLite
+# 4. Enable compression: pip install python-multipart[gzip]
+# 5. Add database connection pooling
+# 6. Use async database drivers
+# 7. Implement rate limiting
+#
+# ==================== DOCKER ALTERNATIVE ====================
+#
+# If you prefer Docker, create this Dockerfile:
+#
+# FROM python:3.11-slim
+# WORKDIR /app
+# COPY requirements.txt .
+# RUN pip install --no-cache-dir -r requirements.txt
+# COPY seqcom_server.py .
+# EXPOSE 8000
+# CMD ["python", "seqcom_server.py"]
+#
+# Build: docker build -t seqcom .
+# Run: docker run -p 8000:8000 seqcom
+#
