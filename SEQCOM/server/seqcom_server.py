@@ -549,14 +549,14 @@ async def root():
         
         <div class="demo-section">
             <h3>Chat with Memory</h3>
-            <input type="text" id="chatInput" placeholder="Ask about the Kyoto trip or anything else..." value="">
+            <input type="text" id="chatInput" placeholder="Ask about anything..." value="">
             <button onclick="testChat()">Send Message</button>
             <div id="chatOutput" class="output">Click "Send Message" to test...</div>
         </div>
         
         <div class="demo-section">
             <h3>Add to Memory</h3>
-            <textarea id="memoryInput" placeholder="Enter information to remember...">Consider staying in a traditional ryokan for authentic experience</textarea>
+            <textarea id="memoryInput" placeholder="Enter information to remember..."></textarea>
             <input type="text" id="tagsInput" placeholder="Tags (comma-separated)" value="">
             <button onclick="addMemory()">Remember This</button>
             <div id="memoryOutput" class="output">Add some information...</div>
