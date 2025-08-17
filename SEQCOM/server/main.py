@@ -718,7 +718,7 @@ async def lifespan(app: FastAPI):
     # Create templates directory if it doesn't exist
     import os
     os.makedirs("templates", exist_ok=True)
-    os.makedirs("static", exist_ok=True)
+    # os.makedirs("static", exist_ok=True)
     yield
     logger.info("Shutting down...")
 
@@ -739,7 +739,7 @@ app.add_middleware(
 )
 
 # Mount static files
-app.mount("/static", StaticFiles(directory="static"), name="static")
+# app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Security
 security = HTTPBearer(auto_error=False)
@@ -972,7 +972,7 @@ if __name__ == "__main__":
     
     # Create necessary directories
     os.makedirs("templates", exist_ok=True)
-    os.makedirs("static", exist_ok=True)
+    # os.makedirs("static", exist_ok=True)
     
     # Write the chat template file if it doesn't exist
     template_path = "templates/chat.html"
