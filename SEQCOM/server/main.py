@@ -62,7 +62,7 @@ class Memory(BaseModel):
 class MemoryManager:
     def __init__(self, db_path: str = "memories.db", 
                  max_memories_per_user: int = 100,
-                 eviction_threshold_days: int = 30,
+                 eviction_threshold_days: int = 365,
                  min_importance_threshold: float = 0.3):
         self.db_path = db_path
         self.lock = threading.Lock()
