@@ -492,31 +492,6 @@ llm_adapter = LLMAdapter()
 async def lifespan(app: FastAPI):
     """Application startup and shutdown"""
     logger.info("🚀 Starting SEQCOM Server...")
-    
-    # Initialize with demo data
-    demo_session = "demo_session"
-    seqcom_engine.remember({
-        "type": "msg",
-        "role": "user",
-        "text": "I'm planning a 7-day trip to Kyoto focusing on traditional culture and temples",
-        "tags": ["travel", "kyoto", "culture", "planning"]
-    }, demo_session)
-    
-    seqcom_engine.remember({
-        "type": "msg", 
-        "role": "user",
-        "text": "Need to include tea ceremony experience and kaiseki dinner reservations",
-        "tags": ["travel", "cultural", "dining", "experiences"]
-    }, demo_session)
-    
-    seqcom_engine.remember({
-        "type": "msg",
-        "role": "user", 
-        "text": "Budget constraint: $2000 total for accommodations and experiences",
-        "tags": ["travel", "budget", "constraints", "accommodation"]
-    }, demo_session)
-    
-    logger.info("✅ Demo data initialized")
     yield
     logger.info("🛑 Shutting down SEQCOM Server...")
 
@@ -574,7 +549,7 @@ async def root():
         
         <div class="demo-section">
             <h3>Chat with Memory</h3>
-            <input type="text" id="chatInput" placeholder="Ask about the Kyoto trip or anything else..." value="What can you tell me about the Kyoto trip plan?">
+            <input type="text" id="chatInput" placeholder="Ask about the Kyoto trip or anything else..." value="">
             <button onclick="testChat()">Send Message</button>
             <div id="chatOutput" class="output">Click "Send Message" to test...</div>
         </div>
@@ -582,7 +557,7 @@ async def root():
         <div class="demo-section">
             <h3>Add to Memory</h3>
             <textarea id="memoryInput" placeholder="Enter information to remember...">Consider staying in a traditional ryokan for authentic experience</textarea>
-            <input type="text" id="tagsInput" placeholder="Tags (comma-separated)" value="travel,accommodation,traditional">
+            <input type="text" id="tagsInput" placeholder="Tags (comma-separated)" value="">
             <button onclick="addMemory()">Remember This</button>
             <div id="memoryOutput" class="output">Add some information...</div>
         </div>
