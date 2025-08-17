@@ -539,11 +539,6 @@ app.add_middleware(
 
 # ==================== API ENDPOINTS ====================
 
-@app.get("/")
-async def root():
-    """Main application"""
-    return ""
-
 @app.get("/health")
 async def health():
     """Health check endpoint"""
@@ -555,8 +550,8 @@ async def health():
         "demo": "/demo"
     }
 
-@app.get("/demo", response_class=HTMLResponse)
-async def demo_page():
+@app.get("/", response_class=HTMLResponse)
+async def root():
     """Interactive demo page"""
     return """
 <!DOCTYPE html>
