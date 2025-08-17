@@ -429,10 +429,9 @@ class LLMAdapter:
         ]
         
         response = await self.openai_client.chat.completions.create(
-            model="gpt-4",
+            model="gpt-5-nano-2025-08-07",
             messages=messages,
-            max_tokens=2000,
-            temperature=0.7
+            max_tokens=2000
         )
         
         return {
