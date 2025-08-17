@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Memory Chat</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .app-container {
+            display: flex;
+            height: 100vh;
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.1);
+        }
+
+        .sidebar {
+            width: 300px;
+            background: linear-gradient(180deg, #2d3748 0%, #1a202c 100%);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.3s ease;
+        }
+
+        .sidebar-header {
+            padding: 2rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            font-size: 0.875rem;
+            opacity: 0.7;
+        }
+
+        .memories-section {
+            flex: 1;
+            padding: 1.5rem;
+            overflow-y: auto;
+        }
+
+        .memories-header {
+            display: flex;
+            align-items: center;
+            justify-content: between;
+            margin-bottom: 1rem;
+            font-size: 0.875rem;
+            font-weight: 600;
+            opacity: 0.8;
+        }
+
+        .memory-item {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 0.75rem;
+            border-left: 3px solid #667eea;
+            transition: all 0.2s ease;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .memory-item:hover {
+            background: rgba(255, 255, 255, 0.15);
+            transform: translateX(4px);
+        }
+
+        .memory-item.protected {
+            border-left-color: #48bb78;
+        }
+
+        .memory-item.at-risk {
+            border-left-color: #ed8936;
+            background: rgba(237, 137, 54, 0.1);
+        }
+
+        .memory-actions {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            display: none;
+            gap: 0.25rem;
+        }
+
+        .memory-item:hover .memory-actions {
+            display: flex;
+        }
+
+        .memory-action-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            border-radius: 4px;
+            color: white;
+            padding: 0.25rem;
+            cursor: pointer;
+            font-size: 0.7rem;
+            transition: background 0.2s ease;
+        }
+
+        .memory-action-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .memory-action-btn.protect {
+            background: rgba(72, 187, 120, 0.3);
+        }
+
+        .memory-action-btn.unprotect {
+            background: rgba(237, 137, 54, 0.3);
+        }
+
+        .memory-type {
+            font-size: 0.75rem;
+            opacity: 0.6;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.25rem;
+        }
+
+        .memory-content {
+            font-size: 0.875rem;
+            line-height: 1.4;
+        }
+
+        .memory-meta {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 0.5rem;
+            font-size: 0.7rem;
+            opacity: 0.5;
+        }
+
+        .chat-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: white;
+        }
+
+        .chat-header {
+            padding: 1.5rem 2rem;
+            border-bottom: 1px solid #e2e8f0;
+            background: linear-gradient(90deg, #f8fafc 0%, #ffffff 100%);
+        }
+
+        .chat-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #2d3748;
+            margin-bottom: 0.25rem;
+        }
+
+        .chat-status {
+            display: flex;
+            align-items: center;
+            font-size: 0.875rem;
+            color: #718096;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: #48bb78;
+            border-radius: 50%;
+            margin-right: 0.5rem;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        .messages-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .message {
+            display: flex;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .message.user {
+            justify-content: flex-end;
+        }
+
+        .message-content {
+            max-width: 70%;
+            padding: 1rem 1.5rem;
+            border-radius: 20px;
+            position: relative;
+        }
+
+        .message.user .message-content {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-bottom-right-radius: 6px;
+        }
+
+        .message.assistant .message-content {
+            background: #f7fafc;
+            color: #2d3748;
+            border: 1px solid #e2e8f0;
+            border-bottom-left-radius: 6px;
+        }
+
+        .message-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            margin: 0 0.75rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.125rem;
+        }
+
+        .message.user .message-avatar {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            order: 2;
+        }
+
+        .message.assistant .message-avatar {
+            background: #e2e8f0;
+            color: #4a5568;
+        }
+
+        .input-container {
+            padding: 1.5rem 2rem;
+            border-top: 1px solid #e2e8f0;
+            background: linear-gradient(90deg, #ffffff 0%, #f8fafc 100%);
+        }
+
+        .input-wrapper {
+            display: flex;
+            align-items: center;
+            background: white;
+            border: 2px solid #e2e8f0;
+            border-radius: 25px;
+            padding: 0.75rem 1.5rem;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        .input-wrapper:focus-within {
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .message-input {
+            flex: 1;
+            border: none;
+            outline: none;
+            font-size: 1rem;
+            background: transparent;
+            resize: none;
+            max-height: 120px;
+            min-height: 24px;
+        }
+
+        .send-button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            margin-left: 0.75rem;
+        }
+
+        .send-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .send-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .typing-indicator {
+            display: none;
+            align-items: center;
+            color: #718096;
+            font-style: italic;
+            margin: 1rem 0;
+        }
+
+        .typing-dots {
+            display: inline-flex;
+            margin-left: 0.5rem;
+        }
+
+        .typing-dots span {
+            width: 6px;
+            height: 6px;
+            background: #cbd5e0;
+            border-radius: 50%;
+            margin: 0 2px;
+            animation: typing 1.4s infinite;
+        }
+
+        .typing-dots span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .typing-dots span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes typing {
+
+            0%,
+            60%,
+            100% {
+                transform: translateY(0);
+            }
+
+            30% {
+                transform: translateY(-10px);
+            }
+        }
+
+        .memory-badge {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background: #48bb78;
+            color: white;
+            font-size: 0.7rem;
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-weight: 600;
+        }
+
+        .memory-used-indicator {
+            display: flex;
+            align-items: center;
+            margin-top: 0.5rem;
+            font-size: 0.75rem;
+            color: #667eea;
+        }
+
+        .memory-count {
+            margin-left: 0.25rem;
+            font-weight: 600;
+        }
+
+        .welcome-message {
+            text-align: center;
+            color: #718096;
+            margin: 3rem 0;
+        }
+
+        .welcome-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #2d3748;
+            margin-bottom: 0.5rem;
+        }
+
+        .welcome-subtitle {
+            font-size: 1rem;
+            line-height: 1.6;
+        }
+
+        .error-message {
+            background: #fed7d7;
+            color: #c53030;
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+            border-left: 4px solid #e53e3e;
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                position: absolute;
+                left: -300px;
+                z-index: 1000;
+                height: 100vh;
+            }
+
+            .sidebar.open {
+                transform: translateX(300px);
+            }
+
+            .app-container {
+                margin: 0;
+                border-radius: 0;
+            }
+        }
+
+        .mobile-toggle {
+            display: none;
+            position: absolute;
+            top: 1rem;
+            left: 1rem;
+            background: rgba(0, 0, 0, 0.1);
+            border: none;
+            border-radius: 6px;
+            padding: 0.5rem;
+            color: #2d3748;
+            cursor: pointer;
+            z-index: 10;
+        }
+
+        @media (max-width: 768px) {
+            .mobile-toggle {
+                display: block;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app-container">
+        <button class="mobile-toggle" onclick="toggleSidebar()">
+            <i class="fas fa-bars"></i>
+        </button>
+
+        <div class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <i class="fas fa-brain"></i> MemoryChat
+                </div>
+                <div class="subtitle">AI with Perfect Memory</div>
+            </div>
+            <div class="memories-section">
+                <div class="memories-header">
+                    <span><i class="fas fa-memory"></i> Active Memories</span>
+                    <span id="memory-count">0</span>
+                </div>
+
+                <div class="memory-stats" id="memory-stats" style="display: none;">
+                    <div class="stat-row">
+                        <span class="stat-label">Capacity:</span>
+                        <span class="stat-value" id="capacity-text">0/100</span>
+                    </div>
+                    <div class="capacity-indicator">
+                        <div class="capacity-fill" id="capacity-fill" style="width: 0%"></div>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Protected:</span>
+                        <span class="stat-value" id="protected-count">0</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Avg. Importance:</span>
+                        <span class="stat-value" id="avg-importance">0%</span>
+                    </div>
+                    <div id="at-risk-warning" class="at-risk-warning" style="display: none;">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        Some memories haven't been used recently and may be evicted.
+                    </div>
+                </div>
+
+                <div id="memories-list">
+                    <div class="welcome-message"
+                        style="color: rgba(255,255,255,0.6); text-align: center; margin-top: 2rem;">
+                        Start a conversation to build memories
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="chat-container">
+            <div class="chat-header">
+                <div class="chat-title">AI Assistant</div>
+                <div class="chat-status">
+                    <div class="status-dot"></div>
+                    <span>Ready to chat and remember</span>
+                </div>
+            </div>
+
+            <div class="messages-container" id="messages-container">
+                <div class="welcome-message">
+                    <div class="welcome-title">👋 Welcome to MemoryChat</div>
+                    <div class="welcome-subtitle">
+                        I'm an AI assistant with perfect memory. Share your preferences, decisions, and important
+                        information—I'll remember everything and use it to give you better, more personalized responses.
+                    </div>
+                </div>
+            </div>
+
+            <div class="typing-indicator" id="typing-indicator">
+                AI is thinking
+                <div class="typing-dots">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
+            </div>
+
+            <div class="input-container">
+                <div class="input-wrapper">
+                    <textarea id="message-input" class="message-input" placeholder="Type your message..." rows="1"
+                        onkeydown="handleKeyDown(event)"></textarea>
+                    <button id="send-button" class="send-button" onclick="sendMessage()">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let sessionId = null;
+        let isTyping = false;
+        let memoryStats = {};
+        const userId = 'demo_user_' + Math.random().toString(36).substr(2, 9);
+
+        // Auto-resize textarea
+        const messageInput = document.getElementById('message-input');
+        messageInput.addEventListener('input', function () {
+            this.style.height = 'auto';
+            this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+        });
+
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('open');
+        }
+
+        function handleKeyDown(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                sendMessage();
+            }
+        }
+
+        function formatTimestamp(date) {
+            return new Date(date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        }
+
+        async function protectMemory(memoryId) {
+            try {
+                const response = await fetch(`/memories/${memoryId}/protect`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                if (response.ok) {
+                    await loadMemories();
+                    console.log('Memory protected');
+                }
+            } catch (error) {
+                console.error('Error protecting memory:', error);
+            }
+        }
+
+        async function unprotectMemory(memoryId) {
+            try {
+                const response = await fetch(`/memories/${memoryId}/protect`, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                if (response.ok) {
+                    await loadMemories();
+                    console.log('Memory unprotected');
+                }
+            } catch (error) {
+                console.error('Error unprotecting memory:', error);
+            }
+        }
+
+        async function deleteMemory(memoryId) {
+            if (!confirm('Are you sure you want to delete this memory?')) return;
+
+            try {
+                const response = await fetch(`/memories/${memoryId}`, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                if (response.ok) {
+                    await loadMemories();
+                    console.log('Memory deleted');
+                }
+            } catch (error) {
+                console.error('Error deleting memory:', error);
+            }
+        }
+
+        function addMessage(role, content, memories = null) {
+            const messagesContainer = document.getElementById('messages-container');
+            const welcomeMessage = messagesContainer.querySelector('.welcome-message');
+            if (welcomeMessage) {
+                welcomeMessage.remove();
+            }
+
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${role}`;
+
+            const avatar = document.createElement('div');
+            avatar.className = 'message-avatar';
+            avatar.innerHTML = role === 'user' ? '<i class="fas fa-user"></i>' : '<i class="fas fa-robot"></i>';
+
+            const messageContent = document.createElement('div');
+            messageContent.className = 'message-content';
+            messageContent.innerHTML = content.replace(/\n/g, '<br>');
+
+            if (memories && memories.length > 0) {
+                const memoryIndicator = document.createElement('div');
+                memoryIndicator.className = 'memory-used-indicator';
+                memoryIndicator.innerHTML = `
+                    <i class="fas fa-brain"></i>
+                    <span class="memory-count">${memories.length} memories used</span>
+                `;
+                messageContent.appendChild(memoryIndicator);
+            }
+
+            messageDiv.appendChild(avatar);
+            messageDiv.appendChild(messageContent);
+
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function showTypingIndicator() {
+            document.getElementById('typing-indicator').style.display = 'flex';
+            isTyping = true;
+        }
+
+        function hideTypingIndicator() {
+            document.getElementById('typing-indicator').style.display = 'none';
+            isTyping = false;
+        }
+
+        function showError(message) {
+            const messagesContainer = document.getElementById('messages-container');
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error-message';
+            errorDiv.innerHTML = `<i class="fas fa-exclamation-triangle"></i> ${message}`;
+            messagesContainer.appendChild(errorDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function updateMemories(memories) {
+            const memoriesList = document.getElementById('memories-list');
+            const memoryCount = document.getElementById('memory-count');
+
+            memoriesList.innerHTML = '';
+
+            if (memories.length === 0) {
+                memoriesList.innerHTML = '<div class="welcome-message" style="color: rgba(255,255,255,0.6); text-align: center; margin-top: 2rem;">Start a conversation to build memories</div>';
+                memoryCount.textContent = '0';
+                document.getElementById('memory-stats').style.display = 'none';
+                return;
+            }
+
+            memoryCount.textContent = memories.length;
+
+            // Show stats
+            updateMemoryStats();
+
+            memories.forEach(memory => {
+                const memoryItem = document.createElement('div');
+                memoryItem.className = 'memory-item';
+
+                const typeColors = {
+                    'preference': '#667eea',
+                    'fact': '#48bb78',
+                    'decision': '#ed8936',
+                    'commitment': '#e53e3e',
+                    'pattern': '#9f7aea',
+                    'context': '#38b2ac'
+                };
+
+                // Check if memory is at risk of eviction
+                const now = new Date();
+                const lastAccessed = new Date(memory.last_accessed);
+                const daysSinceAccess = (now - lastAccessed) / (1000 * 60 * 60 * 24);
+                const isAtRisk = daysSinceAccess > 7 && memory.importance_score < 0.5 && !memory.is_pinned && !memory.is_protected;
+
+                if (memory.is_protected) {
+                    memoryItem.classList.add('protected');
+                } else if (isAtRisk) {
+                    memoryItem.classList.add('at-risk');
+                }
+
+                memoryItem.style.borderLeftColor = typeColors[memory.memory_type] || '#667eea';
+
+                memoryItem.innerHTML = `
+                    <div class="memory-type">${memory.memory_type}</div>
+                    <div class="memory-content">${memory.content}</div>
+                    <div class="memory-meta">
+                        <span>Score: ${(memory.importance_score * 100).toFixed(0)}%</span>
+                        <span>Used: ${memory.access_count}x</span>
+                        ${memory.is_protected ? '<span style="color: #48bb78;"><i class="fas fa-shield-alt"></i> Protected</span>' : ''}
+                        ${isAtRisk ? '<span style="color: #ed8936;"><i class="fas fa-exclamation-triangle"></i> At Risk</span>' : ''}
+                    </div>
+                    <div class="memory-actions">
+                        ${memory.is_protected ?
+                        `<button class="memory-action-btn unprotect" onclick="unprotectMemory('${memory.id}')">
+                                <i class="fas fa-shield-alt"></i>
+                            </button>` :
+                        `<button class="memory-action-btn protect" onclick="protectMemory('${memory.id}')">
+                                <i class="fas fa-shield-alt"></i>
+                            </button>`
+                    }
+                        <button class="memory-action-btn" onclick="deleteMemory('${memory.id}')">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                `;
+
+                if (memory.is_pinned) {
+                    const badge = document.createElement('div');
+                    badge.className = 'memory-badge';
+                    badge.innerHTML = '<i class="fas fa-thumbtack"></i>';
+                    memoryItem.style.position = 'relative';
+                    memoryItem.appendChild(badge);
+                }
+
+                memoriesList.appendChild(memoryItem);
+            });
+        }
+
+        async function loadMemoryStats() {
+            try {
+                const response = await fetch(`/memories/${userId}/stats`);
+                if (response.ok) {
+                    memoryStats = await response.json();
+                    updateMemoryStats();
+                }
+            } catch (error) {
+                console.error('Error loading memory stats:', error);
+            }
+        }
+
+        function updateMemoryStats() {
+            if (!memoryStats || Object.keys(memoryStats).length === 0) return;
+
+            const statsElement = document.getElementById('memory-stats');
+            statsElement.style.display = 'block';
+
+            // Update capacity
+            const capacityPercent = (memoryStats.total_memories / memoryStats.max_memories) * 100;
+            document.getElementById('capacity-text').textContent = `${memoryStats.total_memories}/${memoryStats.max_memories}`;
+            document.getElementById('capacity-fill').style.width = `${Math.min(capacityPercent, 100)}%`;
+
+            // Update other stats
+            document.getElementById('protected-count').textContent = memoryStats.protected_count || 0;
+            document.getElementById('avg-importance').textContent = `${(memoryStats.avg_importance * 100).toFixed(0)}%`;
+
+            // Show at-risk warning
+            const atRiskWarning = document.getElementById('at-risk-warning');
+            if (memoryStats.memories_at_risk || memoryStats.at_capacity) {
+                atRiskWarning.style.display = 'block';
+                if (memoryStats.at_capacity) {
+                    atRiskWarning.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Memory capacity reached. Old memories may be automatically evicted.';
+                }
+            } else {
+                atRiskWarning.style.display = 'none';
+            }
+        }
+
+        async function loadMemories() {
+            try {
+                const response = await fetch(`/memories/${userId}`);
+                if (response.ok) {
+                    const memories = await response.json();
+                    updateMemories(memories);
+                    await loadMemoryStats();
+                }
+            } catch (error) {
+                console.error('Error loading memories:', error);
+            }
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('message-input');
+            const sendButton = document.getElementById('send-button');
+            const message = input.value.trim();
+
+            if (!message || isTyping) return;
+
+            // Add user message
+            addMessage('user', message);
+
+            // Clear input and disable button
+            input.value = '';
+            input.style.height = 'auto';
+            sendButton.disabled = true;
+
+            // Show typing indicator
+            showTypingIndicator();
+
+            try {
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        messages: [{ role: 'user', content: message }],
+                        user_id: userId,
+                        session_id: sessionId,
+                        extract_memories: true
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+
+                // Hide typing indicator
+                hideTypingIndicator();
+
+                // Add assistant response
+                addMessage('assistant', data.response, data.memories_used);
+
+                // Update session ID
+                sessionId = data.session_id;
+
+                // Reload memories if new ones were extracted
+                if (data.memories_extracted && data.memories_extracted.length > 0) {
+                    await loadMemories();
+                }
+
+            } catch (error) {
+                hideTypingIndicator();
+                showError(`Failed to send message: ${error.message}`);
+                console.error('Error sending message:', error);
+            } finally {
+                sendButton.disabled = false;
+            }
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function () {
+            loadMemories();
+            document.getElementById('message-input').focus();
+        });
+
+        // Auto-refresh memories every 30 seconds
+        setInterval(loadMemories, 30000);
+    </script>
+</body>
+
+</html>
