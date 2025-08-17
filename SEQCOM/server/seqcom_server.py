@@ -541,6 +541,11 @@ app.add_middleware(
 
 @app.get("/")
 async def root():
+    """Main application"""
+    return ""
+
+@app.get("/health")
+async def health():
     """Health check endpoint"""
     return {
         "message": "🧠 SEQCOM Server is running",
