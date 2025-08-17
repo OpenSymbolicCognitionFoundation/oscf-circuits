@@ -225,9 +225,19 @@ class MemoryManager:
                 memory_count = cursor.fetchone()[0]
                 
                 if memory_count > self.max_memories_per_user:
-                    logger.info(f"User {memory.user_id} over memory limit ({memory_count}/{self.max_memories_per_user}), triggering eviction")
-                    # Run eviction in background
-                    asyncio.create_task(self._evict_memories_for_user(memory.user_id))
+                    logger.info(f"User {memory.user_id} over memory limit ({memory_count}/{self.max_memories_per_user}), triggering immediate eviction")
+                    # Run eviction immediately in background
+                    def run_eviction():
+                        try:
+                            loop = asyncio.new_event_loop()
+                            asyncio.set_event_loop(loop)
+                            loop.run_until_complete(self._evict_memories_for_user(memory.user_id))
+                            loop.close()
+                        except Exception as e:
+                            logger.error(f"Error in immediate eviction: {e}")
+                    
+                    eviction_thread = threading.Thread(target=run_eviction, daemon=True, name=f"ImmediateEviction-{memory.user_id}")
+                    eviction_thread.start()
                 
                 return True
             except Exception as e:
@@ -254,8 +264,29 @@ class MemoryManager:
 
     async def retrieve_relevant_memories(self, query: str, user_id: str, limit: int = 8) -> List[Memory]:
         """Retrieve the most relevant memories for a query"""
+        # allow empty query → return top by pin/importance/recency
         if not query.strip():
-            return []
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.execute("""
+                    SELECT id, user_id, content, memory_type, importance_score, created_at,
+                           last_accessed, access_count, is_pinned, source_context, tags,
+                           COALESCE(eviction_score, 0.0), COALESCE(is_protected, 0)
+                    FROM memories WHERE user_id = ?
+                """, (user_id,))
+                rows = cursor.fetchall()
+
+            memories = []
+            for row in rows:
+                memories.append(Memory(
+                    id=row[0], user_id=row[1], content=row[2], memory_type=row[3],
+                    importance_score=row[4], created_at=datetime.fromisoformat(row[5]),
+                    last_accessed=datetime.fromisoformat(row[6]), access_count=row[7],
+                    is_pinned=bool(row[8]), source_context=row[9] or "",
+                    tags=json.loads(row[10]) if row[10] else [],
+                    eviction_score=row[11], is_protected=bool(row[12])
+                ))
+            sorted_memories = sorted(memories, key=lambda m: (m.is_pinned, m.importance_score, m.last_accessed), reverse=True)
+            return sorted_memories[:limit]
             
         try:
             # Get user memories
@@ -356,6 +387,326 @@ class MemoryManager:
                 context_parts.append(f"  Tags: {', '.join(memory.tags)}")
         
         return "\n".join(context_parts)
+
+    # === Eviction / Scheduler / Protection / Stats ===========================
+    def _start_eviction_scheduler(self):
+        """
+        Spawn a daemon background thread that periodically runs the eviction cycle.
+        Uses its own asyncio loop to safely await async methods from a thread.
+        """
+        # avoid double-start
+        if getattr(self, "_eviction_thread", None) and self._eviction_thread.is_alive():
+            logger.info("Eviction scheduler already running")
+            return
+
+        # config with env overrides
+        self._eviction_interval_seconds = int(os.getenv("EVICTION_INTERVAL_SECONDS", "900"))  # default 15 min
+        self._stop_eviction = threading.Event()
+
+        def _worker():
+            thread_name = "MemoryEvictionWorker"
+            try:
+                threading.current_thread().name = thread_name
+            except Exception:
+                pass
+
+            logger.info(
+                "Starting %s (interval=%ss, max=%d, thresh_days=%d, min_importance=%.2f)",
+                thread_name,
+                self._eviction_interval_seconds,
+                self.max_memories_per_user,
+                self.eviction_threshold_days,
+                self.min_importance_threshold,
+            )
+
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+            try:
+                while not self._stop_eviction.is_set():
+                    try:
+                        loop.run_until_complete(self._run_eviction_cycle())
+                    except Exception as e:
+                        logger.error("Eviction cycle failed: %s", e)
+
+                    # sleep in 1s ticks so we can stop early if needed
+                    slept = 0
+                    while slept < self._eviction_interval_seconds and not self._stop_eviction.is_set():
+                        time.sleep(1)
+                        slept += 1
+            finally:
+                try:
+                    loop.close()
+                except Exception:
+                    pass
+                logger.info("%s stopped", thread_name)
+
+        self._eviction_thread = threading.Thread(
+            target=_worker, daemon=True, name="MemoryEvictionWorker"
+        )
+        self._eviction_thread.start()
+
+    async def _run_eviction_cycle(self):
+        """
+        One full eviction pass across all users. Computes/update eviction scores,
+        drops stale/low-importance memories, then trims to max per user.
+        """
+        started = time.time()
+        with sqlite3.connect(self.db_path) as conn:
+            users = [row[0] for row in conn.execute("SELECT DISTINCT user_id FROM memories")]
+        if not users:
+            return
+
+        total_deleted = 0
+        for uid in users:
+            try:
+                deleted = await self._evict_memories_for_user(uid)
+                total_deleted += deleted
+            except Exception as e:
+                logger.error("Eviction error for user %s: %s", uid, e)
+
+        logger.info("Eviction cycle done for %d users in %.2fs (deleted=%d)",
+                    len(users), time.time() - started, total_deleted)
+
+    def _compute_eviction_score(
+        self,
+        *,
+        importance: float,
+        last_accessed: datetime,
+        access_count: int,
+        is_pinned: bool,
+        is_protected: bool,
+        created_at: datetime,
+    ) -> float:
+        """
+        Returns a score in [0,1], LOWER = more eligible for eviction.
+        We compute a "value score" then invert to an eviction score.
+
+        value ~= 0.5*importance + 0.25*recency + 0.15*popularity + 0.10*(pinned/protected)
+        eviction = 1 - value
+        """
+        if is_protected:
+            return 1.0  # effectively never evict
+
+        now = datetime.now()
+        idle_days = max(0.0, (now - last_accessed).total_seconds() / 86400.0)
+        age_days = max(0.0, (now - created_at).total_seconds() / 86400.0)
+
+        # recency: 1.0 when accessed today; decays toward 0 as idle_days approaches threshold
+        denom_days = max(1.0, float(self.eviction_threshold_days))
+        recency = max(0.0, 1.0 - min(1.0, idle_days / denom_days))
+
+        # popularity: log-normalized access count (cap to ~50)
+        denom_pop = float(np.log(50.0)) if 50.0 > 1.0 else 1.0
+        popularity = float(min(1.0, (np.log1p(access_count) / denom_pop)))
+
+        pinned_bonus = 0.10 if is_pinned else 0.0
+
+        value = (0.50 * float(importance)) + (0.25 * recency) + (0.15 * popularity) + pinned_bonus
+        value = max(0.0, min(1.0, value))
+
+        eviction = 1.0 - value
+        return float(max(0.0, min(1.0, eviction)))
+
+    async def _evict_memories_for_user(self, user_id: str) -> int:
+        """
+        Update eviction scores for a user's memories, hard-evict stale/low-importance items,
+        then, if still above limit, evict by ascending eviction_score.
+        Returns number of rows deleted.
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            rows = conn.execute(
+                """
+                SELECT id, content, memory_type, importance_score, created_at, last_accessed,
+                       access_count, is_pinned, COALESCE(eviction_score,0.0), COALESCE(is_protected,0)
+                FROM memories
+                WHERE user_id = ?
+                """,
+                (user_id,),
+            ).fetchall()
+
+        if not rows:
+            return 0
+
+        now = datetime.now()
+        # compute new scores + stale flags
+        computed = []
+        for r in rows:
+            mid = r[0]
+            imp = float(r[3])
+            created = datetime.fromisoformat(r[4])
+            last_acc = datetime.fromisoformat(r[5])
+            acc = int(r[6])
+            pinned = bool(r[7])
+            protected = bool(r[9])
+
+            score = self._compute_eviction_score(
+                importance=imp,
+                last_accessed=last_acc,
+                access_count=acc,
+                is_pinned=pinned,
+                is_protected=protected,
+                created_at=created,
+            )
+            idle_days = (now - last_acc).days
+            stale_and_low = (
+                (idle_days >= self.eviction_threshold_days)
+                and (imp < self.min_importance_threshold)
+                and (not pinned)
+                and (not protected)
+            )
+            computed.append((mid, score, pinned, protected, stale_and_low))
+
+        # persist updated scores
+        with self.lock:
+            with sqlite3.connect(self.db_path) as conn:
+                for mid, score, *_ in computed:
+                    conn.execute("UPDATE memories SET eviction_score = ? WHERE id = ?", (score, mid))
+
+        # phase 1: evict stale/low-importance
+        to_delete_ids = [mid for (mid, _s, pin, prot, stale) in computed if stale and not pin and not prot]
+        deleted = 0
+        if to_delete_ids:
+            with self.lock:
+                with sqlite3.connect(self.db_path) as conn:
+                    for mid in to_delete_ids:
+                        cur = conn.execute(
+                            "DELETE FROM memories WHERE id = ? AND is_pinned = 0 AND COALESCE(is_protected,0) = 0",
+                            (mid,),
+                        )
+                        if getattr(cur, "rowcount", -1) != -1:
+                            deleted += max(0, cur.rowcount)
+                        self.memory_vectors.pop(mid, None)
+
+        # phase 2: trim down to limit if still over
+        # Check if user is over memory limit and trigger eviction if needed
+        with sqlite3.connect(self.db_path) as c2:
+            memory_count = c2.execute(
+                "SELECT COUNT(*) FROM memories WHERE user_id = ?", (memory.user_id,)
+            ).fetchone()[0]
+
+
+        overflow = max(0, count - self.max_memories_per_user)
+        if overflow > 0:
+            # choose lowest scores among non-pinned, non-protected and not already removed
+            remaining = [
+                (mid, score)
+                for (mid, score, pin, prot, _stale) in computed
+                if (mid not in to_delete_ids) and (not pin) and (not prot)
+            ]
+            remaining.sort(key=lambda x: x[1])  # ascending = easiest to evict first
+            evict_more = [mid for (mid, _s) in remaining[:overflow]]
+
+            if evict_more:
+                with self.lock:
+                    with sqlite3.connect(self.db_path) as conn:
+                        for mid in evict_more:
+                            cur = conn.execute(
+                                "DELETE FROM memories WHERE id = ? AND user_id = ? AND is_pinned = 0 AND COALESCE(is_protected,0) = 0",
+                                (mid, user_id),
+                            )
+                            if getattr(cur, "rowcount", -1) != -1:
+                                deleted += max(0, cur.rowcount)
+                            self.memory_vectors.pop(mid, None)
+
+        if deleted:
+            logger.info("Evicted %d memories for user %s", deleted, user_id)
+        return deleted
+
+    async def protect_memory(self, memory_id: str) -> bool:
+        """Mark a memory as protected (immune to auto-eviction)."""
+        with self.lock:
+            with sqlite3.connect(self.db_path) as conn:
+                cur = conn.execute(
+                    "UPDATE memories SET is_protected = 1 WHERE id = ?", (memory_id,)
+                )
+                return bool(getattr(cur, "rowcount", 0))
+
+    async def unprotect_memory(self, memory_id: str) -> bool:
+        """Remove protection flag from a memory."""
+        with self.lock:
+            with sqlite3.connect(self.db_path) as conn:
+                cur = conn.execute(
+                    "UPDATE memories SET is_protected = 0 WHERE id = ?", (memory_id,)
+                )
+                return bool(getattr(cur, "rowcount", 0))
+
+    async def get_eviction_stats(self, user_id: str) -> Dict[str, Any]:
+        """
+        Return counts and a preview of top eviction candidates for transparency/UX.
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            total = conn.execute(
+                "SELECT COUNT(*) FROM memories WHERE user_id = ?", (user_id,)
+            ).fetchone()[0]
+            pinned = conn.execute(
+                "SELECT COUNT(*) FROM memories WHERE user_id = ? AND is_pinned = 1", (user_id,)
+            ).fetchone()[0]
+            protected = conn.execute(
+                "SELECT COUNT(*) FROM memories WHERE user_id = ? AND COALESCE(is_protected,0) = 1",
+                (user_id,),
+            ).fetchone()[0]
+
+            # fetch candidates with current scores
+            rows = conn.execute(
+                """
+                SELECT id, content, importance_score, created_at, last_accessed, access_count,
+                       is_pinned, COALESCE(eviction_score,0.0), COALESCE(is_protected,0)
+                FROM memories
+                WHERE user_id = ?
+                """,
+                (user_id,),
+            ).fetchall()
+
+        # recompute scores in-memory for a live view
+        candidates = []
+        for r in rows:
+            mid = r[0]
+            content = r[1]
+            imp = float(r[2])
+            created = datetime.fromisoformat(r[3])
+            last_acc = datetime.fromisoformat(r[4])
+            acc = int(r[5])
+            pin = bool(r[6])
+            prot = bool(r[8])
+
+            score = self._compute_eviction_score(
+                importance=imp,
+                last_accessed=last_acc,
+                access_count=acc,
+                is_pinned=pin,
+                is_protected=prot,
+                created_at=created,
+            )
+            candidates.append((mid, content, score, pin, prot, last_acc, imp, acc))
+
+        # best eviction targets: lowest score and not pinned/protected
+        ranked = [(mid, content, score, last_acc, imp, acc)
+                  for (mid, content, score, pin, prot, last_acc, imp, acc) in candidates
+                  if not pin and not prot]
+        ranked.sort(key=lambda x: x[2])  # lowest score first
+
+        over_by = max(0, total - self.max_memories_per_user)
+        preview = [{
+            "id": mid,
+            "preview": (content[:120] + ("…" if len(content) > 120 else "")),
+            "eviction_score": round(float(score), 4),
+            "last_accessed": last_acc.isoformat(),
+            "importance": round(float(imp), 3),
+            "access_count": int(acc),
+        } for (mid, content, score, last_acc, imp, acc) in ranked[: min(10, len(ranked))]]
+
+        return {
+            "user_id": user_id,
+            "total": total,
+            "pinned": pinned,
+            "protected": protected,
+            "limit": self.max_memories_per_user,
+            "over_limit_by": over_by,
+            "eviction_threshold_days": self.eviction_threshold_days,
+            "min_importance_threshold": self.min_importance_threshold,
+            "top_candidates": preview,
+        }
 
 # Initialize components
 memory_manager = MemoryManager()
@@ -556,10 +907,59 @@ async def manual_eviction(user_id: str, current_user: str = Depends(get_current_
         logger.error(f"Error during manual eviction: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/admin/eviction/test")
+async def test_eviction_cycle(current_user: str = Depends(get_current_user)):
+    """Test the full eviction cycle (admin endpoint)"""
+    try:
+        logger.info("Manual eviction cycle triggered")
+        await memory_manager._run_eviction_cycle()
+        return {"status": "test_eviction_completed", "message": "Check logs for details"}
+    except Exception as e:
+        logger.error(f"Error during test eviction: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/admin/scheduler/status")
+async def scheduler_status(current_user: str = Depends(get_current_user)):
+    """Check eviction scheduler status"""
+    eviction_threads = []
+    for thread in threading.enumerate():
+        if "Eviction" in thread.name:
+            eviction_threads.append({
+                "name": thread.name,
+                "alive": thread.is_alive(),
+                "daemon": thread.daemon
+            })
+    
+    return {
+        "scheduler_running": any(t["alive"] for t in eviction_threads if "Worker" in t["name"]),
+        "threads": eviction_threads,
+        "config": {
+            "max_memories_per_user": memory_manager.max_memories_per_user,
+            "eviction_threshold_days": memory_manager.eviction_threshold_days,
+            "min_importance_threshold": memory_manager.min_importance_threshold
+        }
+    }
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint"""
-    return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+    # Check if eviction thread is running
+    eviction_thread_running = False
+    for thread in threading.enumerate():
+        if thread.name == "MemoryEvictionWorker" and thread.is_alive():
+            eviction_thread_running = True
+            break
+    
+    return {
+        "status": "healthy", 
+        "timestamp": datetime.now().isoformat(),
+        "eviction_scheduler": "running" if eviction_thread_running else "stopped",
+        "memory_config": {
+            "max_memories_per_user": memory_manager.max_memories_per_user,
+            "eviction_threshold_days": memory_manager.eviction_threshold_days,
+            "min_importance_threshold": memory_manager.min_importance_threshold
+        }
+    }
 
 if __name__ == "__main__":
     import uvicorn
